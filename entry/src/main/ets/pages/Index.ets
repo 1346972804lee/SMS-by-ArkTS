@@ -45,9 +45,7 @@ struct addDialog{
   // 定义添加物品函数
   // index里面把addFn已经交过来了，这里已经承接。我们后续给他塞参数即可
   addFn:(item:Item)=>void = ()=>{}
-
-  // 没有模拟器的找补办法
-  closeFn:()=>void = ()=>{}
+  closeFn:()=>void = ()=>{}  // 没有模拟器的找补办法
 
   // 定义如何渲染
   build(){
@@ -101,6 +99,73 @@ struct addDialog{
   }
 }
 
+// 编辑的交互逻辑
+@CustomDialog
+struct editdialog{
+  controller?:CustomDialogController;
+  targetItem?: Item
+  @State name: string = '';
+  @State location: string = '';
+  @State countText: string = '1';
+  @State category: ItemCategory = Object.values(ItemCategory)[0];
+  @State note: string = '';
+  closeFn:()=>void = ()=>{}
+  editFn:(item:Item)=>void = ()=>{}
+  getTargetItemFn:()=>Item|undefined = ():Item|undefined=>{return undefined}
+
+  aboutToAppear(): void {
+    this.targetItem = this.getTargetItemFn()
+    if (this.targetItem) {
+      this.name = this.targetItem.name;
+      this.location = this.targetItem.location;
+      this.countText = this.targetItem.count.toString();
+      this.category = this.targetItem.category;
+      this.note = this.targetItem.note ?? '';
+    }
+  }
+
+  build(){
+    Column({space:10}){
+      // 标题
+      Text(`编辑物品`)
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+      // 第一行：物品名称 物品位置
+      Row({space:10}){
+        TextInput({placeholder:`输入物品位置`})
+          .layoutWeight(1)
+          .onChange((value:string)=>{this.location = value})
+        TextInput({placeholder:`输入物品数量`})
+          .layoutWeight(1)
+          .onChange((value:string)=>{this.countText = value})
+      }
+      .width(`100%`)
+      // 第二行：输入备注
+      TextInput({placeholder:`输入物品备注`})
+        .onChange((value:string)=>{this.note = value})
+      // 第三行：两个按钮
+      Row({space:10}){
+        // 取消按钮
+        Button(`取消`)
+          .layoutWeight(1)
+          .onClick(()=>{
+            this.closeFn()})
+        // 确定按钮：给addFn塞参数，以修改itemList
+        Button(`确定`)
+          .layoutWeight(1)
+          .onClick(()=>{
+            const updatedItem:Item = new Item(this.name.trim(), this.location.trim(), Number(this.countText) || 1, this.category, this.note.trim())
+            if (this.targetItem) {
+              updatedItem.id = this.targetItem.id
+            }
+            this.editFn(updatedItem)
+            this.closeFn()
+          })
+      }
+    }
+  }
+}
+
 @Entry
 @Component
 struct Index {
@@ -114,6 +179,8 @@ struct Index {
   ];
 
   dialogController:CustomDialogController|null = null
+  editDialogController:CustomDialogController|null = null
+  idRecorder:string = ""  //编辑功能要用的，用于记录ForEach传出来的参数
 
   // 状态变量：搜索关键词
   @State query: string = '';
@@ -139,6 +206,22 @@ struct Index {
   closeFn = ():void =>
   {
     this.dialogController?.close()
+    this.editDialogController?.close()
+  }
+
+  editFn = (item:Item):void =>
+  {
+    const idx:number = this.itemList.findIndex((item:Item)=>{return item.id===this.idRecorder})
+    if(idx!==-1){
+      const newItemList:Item[] = [...this.itemList]
+      newItemList[idx] = item
+      this.itemList = newItemList
+    }
+  }
+
+  getTargetItem = ():Item|undefined =>
+  {
+    return this.itemList.find((item:Item)=>{return item.id===this.idRecorder})
   }
 
   // dialogController的builder的回调函数
@@ -146,6 +229,17 @@ struct Index {
   addDialogBuilder(){
     addDialog({addFn:this.addFn, closeFn:this.closeFn})
   }
+
+  // 编辑功能的CustomDialogController的回调函数
+  @Builder
+  editDialogBuilder(){
+    editdialog({
+      editFn:this.editFn,
+      closeFn:this.closeFn,
+      getTargetItemFn:this.getTargetItem
+    })
+  }
+
 
   build() {
     Column() {
@@ -187,17 +281,40 @@ struct Index {
                 .fontSize(12)
                 .fontColor(Color.Gray)
               // 第三排
-              Row(){
-                Text(`数量:${item.count}`)
-                  .margin({right:15})
-                  .fontSize(15)
-                if(item.note){
-                  Text(`备注:${item.note}`)
+              Row() {
+                Row() {
+                  Text(`数量:${item.count}`)
+                    .margin({ right: 15 })
                     .fontSize(15)
+                  if (item.note) {
+                    Text(`备注:${item.note}`)
+                      .fontSize(15)
+                  }
                 }
+                Button("删除")
+                  .fontSize(12)
+                  .height(26)
+                  .padding({ left: 8, right: 8 })
+                  .onClick(() => {
+                    AlertDialog.show({
+                      title:`确定删除`,
+                      message:`确定要删除${item.name}吗`,
+                      primaryButton:{
+                        value:"取消",
+                        action:()=>{}
+                      },
+                      secondaryButton:{
+                        value:'确定',
+                        action:()=>{
+                          this.deleteFn(item.id)
+                        }
+                      }
+                    })
+                  })
               }
                 .width("100%")
-                .justifyContent(FlexAlign.Start)
+                .justifyContent(FlexAlign.SpaceBetween)
+                .alignItems(VerticalAlign.Center)
             }
               .width('100%')
               .padding(16)                    // 1. 内边距：让文字不要贴着卡片边缘
@@ -206,26 +323,17 @@ struct Index {
               .shadow({radius: 4, color: '#1A000000',offsetY: 2})
           }
             .margin({bottom:5,top:5})
-            .gesture(
+            .gesture(  //长按编辑
               LongPressGesture()
                 .onAction(()=>{
-                  AlertDialog.show({
-                    title:`确定删除`,
-                    message:`确定要删除${item.name}吗`,
-                    primaryButton:{
-                      value:"取消",
-                      action:()=>{}
-                    },
-                    secondaryButton:{
-                      value:'确定',
-                      action:()=>{
-                        this.deleteFn(item.id)
-                      }
-                    }
+                  this.idRecorder = item.id
+                  this.editDialogController = new CustomDialogController({
+                    builder:()=>{this.editDialogBuilder()}
                   })
+                  this.editDialogController.open()
                 })
             )
-        },(item:Item)=>item.id)
+        },(item: Item) => `${item.id}_${item.location}_${item.count}_${item.note}`)
       }
       .layoutWeight(1) //吃掉其他组件的剩余空间
       // 新增物品按钮
