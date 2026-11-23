@@ -30,10 +30,11 @@ struct Index {
     return item.name.includes(this.query) || item.location.includes(this.query)
   }
 
-  //给长按删除的filter用的函数
-  deleteFn = (targetId:string):void=>
+  // 删除功能
+  deleteFn = async (targetId:string):Promise<void>=>
   {
-    this.itemList = this.itemList.filter((item:Item)=>{return targetId!==item.id})
+    await this.db.deleteItem(targetId)
+    this.itemList = await this.db.queryAll()
   }
 
   addFn = async (item: Item): Promise<void> => {
@@ -139,8 +140,8 @@ struct Index {
                       },
                       secondaryButton:{
                         value:'确定',
-                        action:()=>{
-                          this.deleteFn(item.id)
+                        action:async ()=>{
+                          await this.deleteFn(item.id)
                         }
                       }
                     })
