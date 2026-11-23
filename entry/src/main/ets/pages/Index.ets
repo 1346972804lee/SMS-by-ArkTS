@@ -168,7 +168,7 @@ struct Index {
                   this.editDialogController.open()
                 })
             )
-        },(item: Item) => `${item.id}_${item.location}_${item.count}_${item.note}`)
+        },(item: Item) => JSON.stringify(item))
       }
       .layoutWeight(1) //吃掉其他组件的剩余空间
       // 新增物品按钮

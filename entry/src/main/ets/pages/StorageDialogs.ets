@@ -103,20 +103,35 @@ export struct editdialog{
       Text(`编辑物品`)
         .fontSize(18)
         .fontWeight(FontWeight.Bold)
-      // 第一行：物品名称 物品位置
+      // 第一行：物品名称
+      TextInput({placeholder:`输入物品名称`, text:this.name})
+        .onChange((value:string)=>{this.name = value})
+      // 第二行：物品位置 物品数量
       Row({space:10}){
-        TextInput({placeholder:`输入物品位置`})
+        TextInput({placeholder:`输入物品位置`, text:this.location})
           .layoutWeight(1)
           .onChange((value:string)=>{this.location = value})
-        TextInput({placeholder:`输入物品数量`})
+        TextInput({placeholder:`输入物品数量`, text:this.countText})
           .layoutWeight(1)
           .onChange((value:string)=>{this.countText = value})
       }
-      .width(`100%`)
-      // 第二行：输入备注
-      TextInput({placeholder:`输入物品备注`})
+        .width(`100%`)
+      // 第三行：类别 切换类别的按钮
+      Row({space:10}){
+        Text(`${this.category}`)
+          .layoutWeight(2)
+        Button(`点击以切换类别`)
+          .layoutWeight(1)
+          .onClick(()=>{
+            const list = Object.values(ItemCategory)
+            let idx = list.indexOf(this.category)
+            this.category = list[(idx+1)%list.length]
+          })
+      }
+      // 第四行：输入备注
+      TextInput({placeholder:`输入物品备注`, text:this.note})
         .onChange((value:string)=>{this.note = value})
-      // 第三行：两个按钮
+      // 第五行：两个按钮
       Row({space:10}){
         // 取消按钮
         Button(`取消`)
