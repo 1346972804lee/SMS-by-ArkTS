@@ -20,8 +20,8 @@ export class Item {
   category: ItemCategory;
   note?: string;
 
-  constructor(name: string, location: string, count: number, category: ItemCategory, note?: string) {
-    this.id = new Date().getTime().toString() + Math.random().toString();
+  constructor(id:string, name: string, location: string, count: number, category: ItemCategory, note?: string) {
+    this.id = id;
     this.name = name;
     this.location = location;
     this.count = count;

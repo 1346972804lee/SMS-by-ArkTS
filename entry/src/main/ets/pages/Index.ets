@@ -1,17 +1,20 @@
 import { Item, ItemCategory } from './ItemModel';
 import { addDialog, editdialog } from './StorageDialogs';
+import { StorageDb } from './storageDb';
+import { common } from '@kit.AbilityKit';
 
 @Entry
 @Component
 struct Index {
   // 状态变量：物品列表
-  @State itemList: Item[] = [
-    new Item("健身衣物", "躺椅上", 3, ItemCategory.Clothing, "红色短裤"),
-    new Item("手表带", "工具箱", 1, ItemCategory.Other),
-    new Item("螺丝刀套装", "工具箱", 1, ItemCategory.Tool, "十字和一字"),
-    new Item("感冒药", "柜子第三层", 5, ItemCategory.Medicine),
-    new Item("手机充电线", "右边抽屉", 2, ItemCategory.Accessory)
-  ];
+  @State itemList: Item[] = [];
+  private db:StorageDb = new StorageDb()
+
+  async aboutToAppear(): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    await this.db.init(context)
+    this.itemList = await this.db.queryAll()
+  }
 
   dialogController:CustomDialogController|null = null
   editDialogController:CustomDialogController|null = null
@@ -33,9 +36,9 @@ struct Index {
     this.itemList = this.itemList.filter((item:Item)=>{return targetId!==item.id})
   }
 
-  addFn = (item:Item):void =>
-  {
-    this.itemList = [...this.itemList, item]
+  addFn = async (item: Item): Promise<void> => {
+    await this.db.insertItem(item)
+    this.itemList = await this.db.queryAll()
   }
 
   closeFn = ():void =>
@@ -44,14 +47,10 @@ struct Index {
     this.editDialogController?.close()
   }
 
-  editFn = (item:Item):void =>
+  editFn = async (item:Item):Promise<void> =>
   {
-    const idx:number = this.itemList.findIndex((item:Item)=>{return item.id===this.idRecorder})
-    if(idx!==-1){
-      const newItemList:Item[] = [...this.itemList]
-      newItemList[idx] = item
-      this.itemList = newItemList
-    }
+    await this.db.updateItem(item)
+    this.itemList = await this.db.queryAll()
   }
 
   getTargetItem = ():Item|undefined =>
