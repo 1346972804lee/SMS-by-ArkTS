@@ -14,6 +14,27 @@ const CREATE_TABLE_SQL: string = `CREATE TABLE IF NOT EXISTS ${TABLE_NAME} (
     note TEXT
   )`;
 
+const COLUMNS = ['id', 'name', 'location', 'count', 'category', 'note']
+
+const toItems = (resultSet:relationalStore.ResultSet):Item[] =>
+{
+  const list:Item[] = []
+  while(resultSet.goToNextRow())
+  { // goToNextRow():游标指向下一个，如果有值，就返回true，否则false
+    const id = resultSet.getString(resultSet.getColumnIndex('id'))
+    const name = resultSet.getString(resultSet.getColumnIndex('name'))
+    const location: string = resultSet.getString(resultSet.getColumnIndex('location'));
+    const count: number = resultSet.getLong(resultSet.getColumnIndex('count'));
+    const categoryStr: string = resultSet.getString(resultSet.getColumnIndex('category'));
+    const noteStr: string = resultSet.getString(resultSet.getColumnIndex('note'));
+    const item = new Item(id, name, location, count,
+      categoryStr as ItemCategory,
+      noteStr || undefined)
+    list.push(item)
+  }
+  return list
+}
+
 export class StorageDb {
   // 创建一个数据库管理器
   private rdbStore:relationalStore.RdbStore|null = null;
@@ -42,33 +63,15 @@ export class StorageDb {
     // 2. 真正的执行查询，通过数据库控制器
     // 2.1 query的第一个函数：查询语句
     // 2.2 query的第二个参数：需要获取的列的列明，用''包住
-    const resultSet:relationalStore.ResultSet = await this.rdbStore.query(predicates,[
-      'id',
-      'name',
-      'location',
-      'count',
-      'category',
-      'note'
-    ])
+    const resultSet:relationalStore.ResultSet = await this.rdbStore.query(predicates, COLUMNS)
     // 3. resultSet是一个数据库行集合，要将其转化为Item[]再返回
-    const list:Item[] = []
+    let list:Item[] = []
     try{ // 无论是否成功将resultSet转化为Item[]，都要释放resultSet
-      while(resultSet.goToNextRow()){ // goToNextRow():游标指向下一个，如果有值，就返回true，否则false
-        const id = resultSet.getString(resultSet.getColumnIndex('id'))
-        const name = resultSet.getString(resultSet.getColumnIndex('name'))
-        const location: string = resultSet.getString(resultSet.getColumnIndex('location'));
-        const count: number = resultSet.getLong(resultSet.getColumnIndex('count'));
-        const categoryStr: string = resultSet.getString(resultSet.getColumnIndex('category'));
-        const noteStr: string = resultSet.getString(resultSet.getColumnIndex('note'));
-        const item = new Item(id,name,location,count,
-          categoryStr as ItemCategory,
-          noteStr || undefined)
-        list.push(item)
-      }
+      list = toItems(resultSet)
     } finally {
       resultSet.close()
     }
-  return list;
+    return list;
   }
 
   // 新增一条物品
@@ -118,4 +121,25 @@ export class StorageDb {
     // 2. 更新数据库是异步操作
     await this.rdbStore.delete(predicates)
   }
+
+  // 搜索功能由内存层改到数据库层
+  async searchItems(keyword:string):Promise<Item[]>{
+    //使用说明：传进来的keyword不允许为空！
+    if(!this.rdbStore) return [];
+    const kw = keyword.trim()
+    const predicates = new relationalStore.RdbPredicates(TABLE_NAME)
+    predicates.contains('name',kw)
+      .or()
+      .contains('location',kw)
+
+    const resultSet:relationalStore.ResultSet = await this.rdbStore.query(predicates,COLUMNS)
+    let list:Item[] = []
+    try{ // 无论是否成功将resultSet转化为Item[]，都要释放resultSet
+      list = toItems(resultSet)
+    } finally {
+      resultSet.close()
+    }
+    return list;
+  }
+
 }

@@ -20,26 +20,33 @@ struct Index {
   editDialogController:CustomDialogController|null = null
   idRecorder:string = ""  //编辑功能要用的，用于记录ForEach传出来的参数
 
-  // 状态变量：搜索关键词
-  @State query: string = '';
+  @State query: string = '';  // 全部变量记录搜索关键词
+  private clockIdRecorder:number = -1
+  private refreshSeqRecorder:number = -1
 
-  // 用于给ForEach的第一个参数做搜索的filter
-  searchFn = (item:Item):boolean =>
+  // 将itemList改为符合当前筛选条件的
+  refresh = async ():Promise<void> =>
   {
-    if(this.query==="") return true
-    return item.name.includes(this.query) || item.location.includes(this.query)
+    const kw = this.query.trim()
+    const seq = ++this.refreshSeqRecorder
+    // query不为空，即搜索框有词，itemList里面为符合搜索条件的记录
+    // query为空，即搜索框没词，itemList里面为所有记录
+    const list = kw===""? await this.db.queryAll() : await this.db.searchItems(kw)
+    if(this.refreshSeqRecorder !== seq) return ;
+    this.itemList = list
   }
 
-  // 删除功能
+  // 删除记录
   deleteFn = async (targetId:string):Promise<void>=>
   {
     await this.db.deleteItem(targetId)
-    this.itemList = await this.db.queryAll()
+    await this.refresh()
   }
 
+  // 添加记录
   addFn = async (item: Item): Promise<void> => {
     await this.db.insertItem(item)
-    this.itemList = await this.db.queryAll()
+    await this.refresh()
   }
 
   closeFn = ():void =>
@@ -48,10 +55,11 @@ struct Index {
     this.editDialogController?.close()
   }
 
+  // 编辑记录
   editFn = async (item:Item):Promise<void> =>
   {
     await this.db.updateItem(item)
-    this.itemList = await this.db.queryAll()
+    await this.refresh()
   }
 
   getTargetItem = ():Item|undefined =>
@@ -88,11 +96,15 @@ struct Index {
         .width("90%")
         .height(40)
         .margin({bottom:15})
-        .onChange((value)=> this.query=value)
+        .onChange((value)=>{
+          this.query = value
+          clearTimeout(this.clockIdRecorder)
+          this.clockIdRecorder = setTimeout(()=>{this.refresh()},300)
+        })
       //展示列表栏
       List(){
         //ForEach第一个参数：要操作的数组
-        ForEach(this.itemList.filter(this.searchFn), (item:Item)=>{
+        ForEach(this.itemList, (item:Item)=>{
           ListItem(){
             Column(){
               // 第一排
